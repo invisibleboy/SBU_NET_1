@@ -33,7 +33,7 @@ public class TCPClient {
                     FileInputStream a=new FileInputStream("/Users/alijahanshahi/1.avi");
                     int r=0,c=0;
                     byte[] send=new byte[1024];
-                    String df=new String("response;1;localhost;6667;IPs.txt");
+                    String df=new String("response;1;192.168.23.201;8888;1.avi");
                     for(int i=0;i<df.length();i++)
                         send[i]=(byte)df.charAt(i);
                     output.write(send);
