@@ -24,11 +24,10 @@ public class TCPClient {
 		Socket s = null;
 		try{
                     int serverPort = 6666;
-                    String ip = "localhost";
+                    String ip = "192.168.23.201";
                     String data = "Hello, How are you?";
                     System.out.println("file"+data);
                     s = new Socket(ip, serverPort);
-//		  DataInputStream input = new DataInputStream(s.getInputStream());
                     DataOutputStream output = new DataOutputStream( s.getOutputStream());
                     FileInputStream a=new FileInputStream("/Users/alijahanshahi/1.avi");
                     int r=0,c=0;
