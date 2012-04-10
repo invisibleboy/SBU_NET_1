@@ -6,7 +6,8 @@ package peer;
 
 import java.net.*;
 import java.io.*;
-import java.util.Enumeration;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Scanner;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -24,16 +25,125 @@ public class Main {
 
 
         //getting peer ip in network
-        System.out.println("Enter Server ip:");
+        System.out.println("Enter your current IP:");
         Scanner n = new Scanner(System.in);
-        String ip = n.next();
-        System.out.println("your IP is: " + ip);
-        int serverPort = randomProt();
-        //incoming socket -> for massage come in and responsing them
+        String myIP = n.next();
+        System.out.println("your IP is: " + myIP);
+        //generate a random port for this peer
+        int myPort = randomProt();
+
+        //getting server IP and port
+        System.out.println("Enter Server IP:");
+        Scanner m = new Scanner(System.in);
+        String serverIP = m.next();
+
+
+        System.out.println("Enter Server PORT:");
+        Scanner o = new Scanner(System.in);
+        String serverPort = o.next();
+
+        //incoming socket -> for message come in and responsing them
         //outgointToServer -> for server-peer interactions
-        ServerSocket ListenSocket = null;
-        Socket incoming = null;
-        Socket outgoingToServer = null;
+//        System.out.println("Connecting to Server : " + serverIP + ":" + serverPort);
+//        ServerPeerInteractions serverPeer = new ServerPeerInteractions(serverIP, serverPort, myIP, myPort);
+        InputRequestHandler requestHandler = new InputRequestHandler(myIP, myPort);
+    }
+
+    private static int randomProt() {
+
+        return (1000 + (int) (Math.random() * 60000));
+    }
+}
+
+class ServerPeerInteractions extends Thread {
+
+    private Socket skt;
+    private String serverIP, myIP, directory;
+    private Integer serverPort, myPort;
+    private DataOutputStream out;
+    private List<String> files;
+
+    public ServerPeerInteractions(String sIP, String sPort, String myIP, int myPort) {
+        
+        serverIP = sIP;
+        this.myIP = myIP;
+        serverPort = new Integer(sPort);
+        this.myPort = new Integer(myPort);
+
+        //getting shared folder on NETWORK
+        System.out.println("Enter address of shared folder:");
+
+        Scanner s = new Scanner(System.in);
+        directory = s.next();
+        try {
+            skt = new Socket(serverIP, serverPort);
+        }
+        catch (UnknownHostException ex) {
+            System.out.println("Newing socket for connecting to Server : " + serverIP + ":" + serverPort + " has a problem");
+        }
+        catch (IOException ex) {
+            System.out.println("Newing socket for connecting to Server : " + serverIP + ":" + serverPort + " has a problem");
+        }
+        try {
+            out = new DataOutputStream(skt.getOutputStream());
+        }
+        catch (IOException ex) {
+            System.out.println("Newing dataOutputStream for connecting to Server : " + serverIP + ":" + serverPort + " has a problem");
+        }
+        //getting list of files
+        files = new LinkedList<String>();
+        sharedDirectoryFiles();
+        connectToServer();
+        this.start();
+    }
+
+    private void connectToServer() {
+        String connectmessage = new String("connect;" + myIP + ";" + myPort + ";");
+        for (int i = 0; i < files.size() - 1; i++) {
+            connectmessage.concat(files.get(i) + ";");
+        }
+        byte[] temp = new byte[connectmessage.length()];
+        connectmessage.concat(files.get(files.size() - 1));
+        for (int i=0 ; i <connectmessage.length() ; i++)
+            temp[i] = (byte) connectmessage.charAt(i);
+            try {
+                PrintWriter a = new PrintWriter(skt.getOutputStream(), true);
+                a.println(connectmessage);
+            } catch (IOException ex) {
+                System.out.println("Sending CONNECT message  in ServerPeerInteraction class/ ConnectToServer has a problem!");
+            }
+
+    }
+
+    private void sharedDirectoryFiles() {
+        File firstiew = new File(directory);
+        File[] list = firstiew.listFiles();
+        for (int i = 0; i < list.length; i++) {
+            if (list[i].isFile()) {
+                files.add(list[i].getName());
+            }
+        }
+    }
+
+    @Override
+    public void run() {
+    }
+}
+
+class InputRequestHandler {
+
+    private ServerSocket ListenSocket;
+    private int serverPort;
+    private String ip;
+    private Socket incoming;
+    private Socket outgoingToServer;
+
+    public InputRequestHandler(String i, int p) {
+        serverPort = p;
+        ip = i;
+        ListenSocket = null;
+        incoming = null;
+        outgoingToServer = null;
         try {
             ListenSocket = new ServerSocket(serverPort);
             System.out.println("Server is listening on port: " + serverPort);
@@ -48,11 +158,6 @@ public class Main {
         } catch (Exception e) {
             System.out.println("Socket problem");
         }
-
-    }
-    private static int randomProt(){
-
-        return (1000 + (int)(Math.random()*60000));
     }
 }
 
@@ -60,7 +165,7 @@ class PeerHandler extends Thread {
 
     Socket skt;
     String ip;
-    Integer mainPort;
+    Integer DownloadPort;
     DataInputStream input;
     DataOutputStream output;
     FileInputStream reader;
@@ -70,7 +175,7 @@ class PeerHandler extends Thread {
         try {
             skt = s;
             this.ip = ip;
-            mainPort = new Integer(port + 1);
+            DownloadPort = new Integer(port + 1);
             input = new DataInputStream(skt.getInputStream());
             output = new DataOutputStream(skt.getOutputStream());
         } catch (IOException ex) {
@@ -79,12 +184,16 @@ class PeerHandler extends Thread {
         this.start();
     }
 
-    private void sendRequestTopeer(String Port, String ip, String fileName) {
-        //
+    private void sendRequestTopeer(String[] parameters) {
+        //Here peer sends a give-me request to another peer with Its IP and listen port for
+        String Port = parameters[3];
+        String ip = parameters[2];
+        String fileName = parameters[4];
         Integer peerPort = new Integer(Port);
-        System.out.println("port:" + peerPort);
+        System.out.println("port:" + peerPort+" ip :"+ip);
         Socket download = null;
-        DataOutputStream requestForDownload = null;
+//        DataOutputStream requestForDownload = null;
+        PrintWriter requestForDownload = null;
         try {
             download = new Socket(ip, peerPort);
         } catch (UnknownHostException ex) {
@@ -93,45 +202,36 @@ class PeerHandler extends Thread {
             System.out.println("newing socket for sending give-me request to peer has a problem in peerhandler class : sendrequesttopeer function!");
         }
         try {
-            requestForDownload = new DataOutputStream(download.getOutputStream());
+//            requestForDownload = new DataOutputStream(download.getOutputStream());
+            requestForDownload = new PrintWriter(download.getOutputStream(), true);
         } catch (IOException ex) {
             System.out.println("newing DataOutputStream for sending give-me request to peer has a problem in peerhandler class : sendrequesttopeer function!");
         }
         String df = new String("give-me;");
-        df = df.concat(this.ip + ";" + mainPort.toString() + ";");
+        df = df.concat(this.ip + ";" + DownloadPort.toString() + ";");
         df = df.concat(fileName);
-        System.out.println("sent massage : " + df);
-//         System.out.println("ip & port: "+this.ip+" "+mainPort);
-        byte[] send = new byte[1024];
-        for (int i = 0; i < df.length(); i++) {
-            send[i] = (byte) df.charAt(i);
-        }
         try {
-            requestForDownload.write(send);
-        } catch (IOException ex) {
-            System.out.println("sending give-me request to peer has a problem in peerhandler class : sendrequesttopeer function!");
+            System.out.println("sent message: "+df + " to "+ip+ " "+ peerPort);
+            requestForDownload.println(df);
+        } catch (Exception ex) {
+            System.out.println("Sending give-me request to peer has a problem in peerhandler class : sendrequesttopeer function!");
         }
         System.out.println("Download request sent to : " + ip + " for downloading file: " + fileName);
-        Downloader downloader = new Downloader(fileName, mainPort);
+        Downloader downloader = new Downloader(fileName, DownloadPort);
     }
 
     @Override
     public void run() {
         try {
+            
             int b = 0, c = 0;
             byte[] data = new byte[1024];
             char[] request = new char[1024];
-            if ((b = input.read(data)) >= 0) {
-                for (int i = 0; i < 1024; i++) {
-                    request[c] = (char) data[i];
-                    c++;
-                }
-            } else {
-                System.out.println("file finished");
-            }
-            String massage = new String(request);
-            String[] parameters = massage.split(";");
-            System.out.println("massage from: " + skt.getInetAddress() + " massage: " + massage);
+            String message = new String();
+            BufferedReader d = new BufferedReader(new InputStreamReader(input));
+            message = d.readLine();
+            String[] parameters = message.split(";");
+            System.out.println("message from: " + skt.getInetAddress() + " message: "+ message);
             //response recieved from server
             // 0-> no file found
             // 1-> parameters are: ip-port-filename
@@ -139,19 +239,30 @@ class PeerHandler extends Thread {
                 if (parameters[1].startsWith("1")) {
                     //sending download request 'give-me;filename' to peer
                     //and downloading file from connection
-                    sendRequestTopeer(parameters[3], parameters[2], parameters[4]);
+                    sendRequestTopeer(parameters);
                 } else {
                     System.out.println("Requested file was not found!");
                 }
-            } //here peer must send requested file
+            }
+            //here peer must send requested file sender class sends requested file
             else if (parameters[0].startsWith("give-me")) {
                 Sender sender = new Sender(parameters[1], parameters[2], parameters[3]);
-            } else {
-                System.out.println("Wrong massage format!");
             }
-        } catch (IOException ex) {
+            //prints search result
+            else if (parameters[0].startsWith("Searchresult")){
+                //todo
+                //depends on recived data structure print them;
+            }
+            //wrong forat message recieved
+            else {
+                System.out.println("Wrong message format!");
+            }
+        }
+
+        catch (IOException ex) {
             System.out.println("IOstream reading problem!");
         }
+
 
     }
 }
@@ -207,6 +318,10 @@ class Downloader {
         }
     }
 }
+
+/*
+ * this class sendes given file to given ip and port
+ */
 
 class Sender {
 
