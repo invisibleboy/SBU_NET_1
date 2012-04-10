@@ -4,13 +4,11 @@
  */
 package server;
 
-
 import java.net.*;
 import java.io.*;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
 
 /**
  *
@@ -102,30 +100,37 @@ class Server {
             this.files.add(file);
         }
     }
-    public Client getClient(String name){
-        for(int i=0;i<clients.size();i++)
-            if(clients.get(i).getName().equals(name))
+
+    public Client getClient(String name) {
+        for (int i = 0; i < clients.size(); i++) {
+            if (clients.get(i).getName().equals(name)) {
                 return clients.get(i);
+            }
+        }
         return null;
 
     }
-    public File getFile(String name){
-        for(int i=0;i<files.size();i++)
-            if(files.get(i).getName().equals(name))
+
+    public File getFile(String name) {
+        for (int i = 0; i < files.size(); i++) {
+            if (files.get(i).getName().equals(name)) {
                 return files.get(i);
+            }
+        }
         return null;
     }
-    public void removeClient(String name){
-        for(int i=0;i<files.size();i++){
-            File c=files.get(i);
-            if(c.getClient(name)!=null)
-            {
+
+    public void removeClient(String name) {
+        for (int i = 0; i < files.size(); i++) {
+            File c = files.get(i);
+            if (c.getClient(name) != null) {
                 c.clients.remove(c.getClient(name));
 
             }
         }
         clients.remove(getClient(name));
     }
+
     public Server(String ip, int port) {
         files = new ArrayList<File>();
         clients = new ArrayList<Client>();
@@ -144,15 +149,20 @@ class File {
 
     String Name;
     List<Client> clients;
-    public Client getClient(String name){
-        for(int i=0;i<clients.size();i++)
-            if(clients.get(i).getName().equals(name))
+
+    public Client getClient(String name) {
+        for (int i = 0; i < clients.size(); i++) {
+            if (clients.get(i).getName().equals(name)) {
                 return clients.get(i);
+            }
+        }
         return null;
 
     }
+
     public File(String Name) {
         this.Name = Name;
+        clients=new ArrayList<Client>();
     }
 
     public boolean addClient(Client client) {
@@ -205,8 +215,9 @@ class Client implements Comparable<Client> {
     int downloadCount;
     static int InstanceCount = 0;
     boolean isAlive;
+
     public Client(String ip, String port, int downloadCount) {
-        this.isAlive=true;
+        this.isAlive = true;
         this.ip = ip;
         this.port = port;
         this.downloadCount = downloadCount;
@@ -286,24 +297,15 @@ class ServerHandler extends Thread {
         DataOutputStream out = null;
         try {
             s = new Socket(ip, port);
-            out = new DataOutputStream(s.getOutputStream());
-        } catch (UnknownHostException ex) {
-            Logger.getLogger(ServerHandler.class.getName()).log(Level.SEVERE, null, ex);
+            PrintWriter a = new PrintWriter(s.getOutputStream(), true);
+            a.println(data);
         } catch (IOException ex) {
-            Logger.getLogger(ServerHandler.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        byte[] send = new byte[1024];
-        for (int i = 0; i < data.length(); i++) {
-            send[i] = (byte) data.charAt(i);
-        }
-        try {
-            out.write(send);
-        } catch (IOException ex) {
-            Logger.getLogger(ServerHandler.class.getName()).log(Level.SEVERE, null, ex);
+            System.out.println("Sending CONNECT message  in ServerPeerInteraction class/ ConnectToServer has a problem!");
         }
     }
 
     private void register(String ip, String port, List<String> files) {
+        //todo port and ip
         Client client = new Client(ip, port, 0);
         for (int i = 0; i < files.size(); i++) {
             File F = new File(files.get(i));
@@ -315,14 +317,16 @@ class ServerHandler extends Thread {
     }
 
     private void refresh(String name, int dLCount, List<String> fileNames) {
-        server.getClient(name).isAlive=true;
+        server.getClient(name).isAlive = true;
         server.getClient(name).setDownloadCount(dLCount);
         //todo refresh files list
     }
-    private void remove(String name){
+
+    private void remove(String name) {
         server.removeClient(name);
 
     }
+
     private void sendPeersHaveFile(String fileName) {
         String data;
         if (!server.files.contains(new File(fileName))) {
@@ -343,25 +347,27 @@ class ServerHandler extends Thread {
     @Override
     public void run() {
         try {
-            int c = 0, cnt;
-            byte[] data = new byte[1024];
-            char[] request = new char[1024];
-            while ((cnt = input.read(data)) >= 0) {
-                for (int i = 0; i < cnt; i++) {
-                    request[c++] = (char) data[i];
-                }
-            }
-
+//            int c = 0, cnt;
+//            byte[] data = new byte[1024];
+//            char[] request = new char[1024];
+//            while ((cnt = input.read(data)) >= 0) {
+//                for (int i = 0; i < cnt; i++) {
+//                    request[c++] = (char) data[i];
+//                }
+//            }
+            BufferedReader d = new BufferedReader(new InputStreamReader(input));
+            String message = new String();
+            message = d.readLine();
             System.out.println("packet received");
 
-            String massage = new String(request);
-            String[] parameters = massage.split(";");
+            String[] parameters = message.split(";");
             List<String> param = new ArrayList<String>();
             for (int i = 1; i < parameters.length; i++) {
                 param.add(parameters[i]);
             }
             String requestName = parameters[0];
-            System.out.println("massage from: " + skt.getInetAddress() + " massage: " + requestName);
+            System.out.println("massage from: " + skt.getInetAddress() + " massage: " + message);
+
             /*
              *
             hi;ip;port;file1;file2;file3;...//from peer to server
@@ -374,9 +380,9 @@ class ServerHandler extends Thread {
 
             request;filename//from peer to server
 
-            response;filename;Count;name;ip;port;name;ip;port;....//from server to peer
+            response;Count;filename;name;ip;port;name;ip;port;....//from server to peer
 
-            response;0//from server to peer
+            response;0;filename//from server to peer
 
             //resume-pause
 
